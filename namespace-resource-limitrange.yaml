@@ -1,0 +1,33 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-namespace-limit
+spec:
+  rules:
+  - name: namespace-limit
+    match:
+      resources:
+        kinds:
+        - Namespace
+    exclude:
+      resources:
+        namespaces:
+        - kube-system
+        - default
+        - kube-public
+        - kyverno
+    generate:
+      kind: LimitRange
+      name: namespace-limitrange
+      synchronize: true
+      namespace: "{{request.object.metadata.name}}"
+      data:
+        spec:
+          limits:
+          - type: Container
+            default:
+              cpu: 1
+              memory: 2Gi
+            defaultRequest:
+              cpu: 100m
+              memory: 128Mi
