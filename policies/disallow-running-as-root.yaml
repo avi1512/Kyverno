@@ -1,0 +1,92 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-root-user
+  annotations:
+    policies.kyverno.io/title: Disallow Running as Root
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Containers running as the root user (UID 0) pose a security risk. This policy prevents
+      containers, initContainers, and ephemeralContainers from running as UID 0 unless the Pod
+      has the label `allowRoot: "true"` set.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-root-user-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding Container resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Running containers as root (UID 0) is not allowed."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.containers[*].securityContext.runAsUser }}"
+                operator: AnyIn
+                value:
+                  - 0
+
+    - name: disallow-root-user-init-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding initcontainer resources using names
+      exclude:
+        resources:
+          names:
+            # Excluding opensearch container resources using names
+            - opensearch-cluster*
+            # Excluding sonar container resources using names
+            - sonar-sonarqube-dce-search*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Running init containers as root (UID 0) is not allowed."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.initContainers[*].securityContext.runAsUser }}"
+                operator: AnyIn
+                value:
+                  - 0
+
+    - name: disallow-root-user-ephemeral-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding ephemeral container resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Running ephemeral containers as root (UID 0) is not allowed."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.ephemeralContainers[*].securityContext.runAsUser }}"
+                operator: AnyIn
+                value:
+                  - 0

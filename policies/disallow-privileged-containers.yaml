@@ -1,0 +1,92 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-containers
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Privileged containers have unrestricted host access and can pose significant security risks.
+      This policy prevents the use of privileged containers (including initContainers and ephemeralContainers),
+      unless explicitly allowed by setting the label `allowPrivileged: "true"` on the Pod.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-privileged-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding container resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivileged || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privileged containers are not allowed in Pods."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.containers[*].securityContext.privileged }}"
+                operator: AnyIn
+                value:
+                  - true
+
+    - name: disallow-privileged-init-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding initContainer resources using names
+      exclude:
+        resources:
+          names:
+            # Excluding opensearch container resources using names
+            - opensearch-cluster*
+            # Excluding sonar container resources using names
+            - sonar-sonarqube-dce-search*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivileged || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privileged initContainers are not allowed in Pods."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.initContainers[*].securityContext.privileged }}"
+                operator: AnyIn
+                value:
+                  - true
+
+    - name: disallow-privileged-ephemeral-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+      # Excluding ephemeral container resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivileged || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privileged ephemeral containers are not allowed in Pods."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.ephemeralContainers[*].securityContext.privileged }}"
+                operator: AnyIn
+                value:
+                  - true

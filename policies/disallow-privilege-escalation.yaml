@@ -1,0 +1,90 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privilege-escalation-for-pods
+  annotations:
+    policies.kyverno.io/title: Disallow Privilege Escalation
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      This policy ensures that privilege escalation is not allowed in containers, initContainers,
+      or ephemeral containers. Containers should not be allowed to gain more privileges than their
+      parent process. This helps enforce the principle of least privilege and improves the overall
+      security posture of your Kubernetes workloads.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-priv-escalation-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+      # Excluding resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivilegeEscalation || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privilege escalation is not allowed in regular containers."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.containers[*].securityContext.allowPrivilegeEscalation }}"
+                operator: AnyIn
+                value:
+                  - true
+
+    - name: disallow-priv-escalation-initcontainers
+      match:
+        resources:
+          kinds:
+            - Pod
+      # Excluding resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivilegeEscalation || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privilege escalation is not allowed in initContainers."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.initContainers[*].securityContext.allowPrivilegeEscalation }}"
+                operator: AnyIn
+                value:
+                  - true
+
+    - name: disallow-priv-escalation-ephemeralcontainers
+      match:
+        resources:
+          kinds:
+            - Pod
+      # Excluding resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowPrivilegeEscalation || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Privilege escalation is not allowed in ephemeralContainers."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.ephemeralContainers[*].securityContext.allowPrivilegeEscalation }}"
+                operator: AnyIn
+                value:
+                  - true

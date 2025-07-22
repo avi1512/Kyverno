@@ -1,0 +1,36 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: deny-sensitive-host-mounts
+  annotations:
+    policies.kyverno.io/title: Disallow Sensitive HostPath Mounts
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      This policy prevents workloads from mounting sensitive host directories such as /etc, /proc, or /sys.
+      These mounts can compromise the security and integrity of the node. HostPath usage should be tightly
+      controlled and restricted to avoid privilege escalation and container escape vulnerabilities.
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-sensitive-host-mounts
+      match:
+        resources:
+          kinds:
+            - Pod
+            - Deployment
+      # Excluding resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      validate:
+        message: "Mounting sensitive host system directories (e.g., /etc, /proc) is not allowed."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.volumes[?(@.hostPath)].hostPath.path }}"
+                operator: AnyIn
+                value:
+                  - "/etc"
+                  - "/proc"
+                  - "/sys"

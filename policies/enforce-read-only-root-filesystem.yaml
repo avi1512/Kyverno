@@ -1,0 +1,91 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-read-only-root-filesystem
+  annotations:
+    policies.kyverno.io/title: Enforce Read-Only Root Filesystem
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Running containers with a read-only root filesystem is a best practice to improve
+      container security and prevent potential tampering. This policy enforces that all
+      containers, including init and ephemeral containers, must have the 
+      `readOnlyRootFilesystem` securityContext field set to `true`. To bypass this policy,
+      add the label `allowWritableRoot: "true"` to the Pod.
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: enforce-read-only-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding container resources using names
+      exclude:
+        resources:
+          names:
+            # Excluding Ingress container resources using names
+            - ingress-nginx-controller*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowWritableRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "The root filesystem of containers must be read-only."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.containers[*].securityContext.readOnlyRootFilesystem }}"
+                operator: AnyIn
+                value:
+                  - false
+
+    - name: enforce-read-only-init-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding initContainer resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowWritableRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "The root filesystem of init containers must be read-only."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.initContainers[*].securityContext.readOnlyRootFilesystem }}"
+                operator: AnyIn
+                value:
+                  - false
+
+    - name: enforce-read-only-ephemeral-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+    # Excluding ephemeral container resources using names
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowWritableRoot || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "The root filesystem of ephemeral containers must be read-only."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.ephemeralContainers[*].securityContext.readOnlyRootFilesystem }}"
+                operator: AnyIn
+                value:
+                  - false

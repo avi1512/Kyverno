@@ -1,0 +1,37 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: deny-host-namespaces
+  annotations:
+    policies.kyverno.io/title: Disallow Host Namespaces
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      This policy denies Pods that request access to host namespaces such as network, PID, or IPC.
+      Sharing host namespaces can compromise node isolation and is considered a security risk.
+      The policy ensures these fields are not set to true.
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-host-namespaces
+      match:
+        resources:
+          kinds:
+            - Pod
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      validate:
+        message: "Sharing the host's network, process, or UTS namespace is not allowed."
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.hostNetwork || `false` }}"
+                operator: Equals
+                value: true
+              - key: "{{ request.object.spec.hostPID || `false` }}"
+                operator: Equals
+                value: true
+              - key: "{{ request.object.spec.hostIPC || `false` }}"
+                operator: Equals
+                value: true

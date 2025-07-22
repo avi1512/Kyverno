@@ -1,0 +1,46 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-hostpath-volumes
+  annotations:
+    policies.kyverno.io/title: Disallow hostPath
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      HostPath volumes let Pods use host directories and volumes in containers.
+      Using host resources can be used to access shared data or escalate privileges
+      and should not be allowed. This policy ensures no hostPath volumes are in use
+      unless the Pod has an allowHostPath=true label.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-hostpath-volumes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+    # Excluding hostpath resources using names
+      exclude:
+        resources:
+          names:
+            #Excluding akv2k8s container resources
+            - akv2k8s-controller*
+            #Excluding velero container resources
+            - node-agent*
+            #Excluding new relic container resources
+            - new-relics-agents*
+            #Excluding spegel container resources
+            - spegel*
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.allowHostPath || '' }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: >-
+          HostPath volumes are forbidden. The field spec.volumes[*].hostPath must be unset.
+        pattern:
+          spec:
+            =(volumes):
+              - X(hostPath): "null"

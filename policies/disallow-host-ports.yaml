@@ -1,0 +1,71 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-ports
+  annotations:
+    policies.kyverno.io/title: Disallow hostPorts
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Access to host ports allows potential snooping of network traffic and should not be
+      allowed, or at minimum restricted to a known list. This policy ensures that the
+      `hostPort` field is unset or set to `0`. Specific Pods may be excluded by name if required.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-host-ports-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+      exclude:
+        resources:
+          names:
+            - spegel*
+      validate:
+        message: >-
+          Use of host ports in containers is disallowed. The field
+          spec.containers[*].ports[*].hostPort must be unset or set to 0.
+        pattern:
+          spec:
+            containers:
+              - =(ports):
+                  - =(hostPort): 0
+
+    - name: disallow-host-ports-init-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      validate:
+        message: >-
+          Use of host ports in initContainers is disallowed. The field
+          spec.initContainers[*].ports[*].hostPort must be unset or set to 0.
+        pattern:
+          spec:
+            =(initContainers):
+              - =(ports):
+                  - =(hostPort): 0
+
+    - name: disallow-host-ports-ephemeral-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+      #exclude:
+        #resources:
+          #names:
+            #- test*
+      validate:
+        message: >-
+          Use of host ports in ephemeralContainers is disallowed. The field
+          spec.ephemeralContainers[*].ports[*].hostPort must be unset or set to 0.
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - =(ports):
+                  - =(hostPort): 0
